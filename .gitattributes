@@ -1,2 +1,4 @@
 test_MNIST.ipynb filter=lfs diff=lfs merge=lfs -text
 data/* filter=lfs diff=lfs merge=lfs -text
+data/models/test_MNIST_train_data.pickle filter=lfs diff=lfs merge=lfs -text
+data/metadata/test_MNIST_weights.pth filter=lfs diff=lfs merge=lfs -text
