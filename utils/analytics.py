@@ -1,6 +1,6 @@
 import plotly.graph_objects as go
 import numpy as np
-from scipy.stats import norm
+from scipy.stats import norm, kstest, levy_stable
 import itertools
 import plotly_express as px
 import matplotlib.pyplot as plt 
@@ -121,3 +121,29 @@ def log_log_plot(data=None, title:str="", bins=50, x_range=(1e-3, 1e1), grid=Fal
     if grid: 
         plt.grid(True, which="both", ls="--", lw=0.5)
     plt.show()
+
+def compare_stable_vs_gaussian(weights: np.ndarray):
+    """
+    1. fits a gaussian distribution to the input data
+    2. fits a levy stable distribution to the input data
+
+    perform a KS Test for both fits with the empirical data
+
+    devide the p value of the stable fit by the p value of the gaussian fit: 
+        r > 1 -> stable is a better fit
+        r < 1 -> gaussian is a better fit
+
+    Args:
+        weights (np.ndarray): weight matrix of a layer
+    """
+
+    alpha, beta, sigma, mu = levy_stable.fit(weights.flatten())
+    muN, sigN = norm.fit(weights.flatten())
+
+    p_stable = kstest(weights.flatten(), 'levy_stable', args=(alpha, beta, sigma, mu))[1]
+    p_gauss = kstest(weights.flatten(), 'norm', args=(muN, sigN))[1]
+
+    r = p_stable / p_gauss
+
+    return r
+
