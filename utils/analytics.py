@@ -92,11 +92,16 @@ def eval_fit_methods(beta: float = 0, gamma: float = 1, delta: float = 0, n_samp
             alpha_tail = se.alpha_tail_regression(data)
         except Exception:
             alpha_tail = np.nan
+        
+        try: 
+            alpha_robust = se.robust_alpha_estimator(data)
+        except Exception:
+            alpha_robust = np.nan
 
-        results.append([alpha_val, alpha_ml, alpha_quantile, alpha_logmom, alpha_tail])
+        results.append([alpha_val, alpha_ml, alpha_quantile, alpha_logmom, alpha_tail, alpha_robust])
 
     df_results = pd.DataFrame(results, columns=[
-        "alpha_true", "alpha_ml", "alpha_quantile", "alpha_logmom", "alpha_tail"
+        "alpha_true", "alpha_ml", "alpha_quantile", "alpha_logmom", "alpha_tail", "alpha_robust"
     ])
 
     if return_data:

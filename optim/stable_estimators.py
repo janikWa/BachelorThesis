@@ -110,3 +110,23 @@ def alpha_tail_regression(data, tail_fraction=0.1):
     alpha = -slope
     alpha = min(max(alpha, 0.1), 2.0)
     return alpha
+
+
+def robust_alpha_estimator(data, tail_fraction=0.1):
+    """
+    Robust estimator combining tail-regression and MLE.
+    
+    - For alpha <= 0.5, use tail regression.
+    - Otherwise, use MLE.
+    - If MLE estimate > 2, set alpha = 2.
+    """
+    # Tail estimate
+    alpha_tail = alpha_tail_regression(data, tail_fraction=tail_fraction)
+    
+    if alpha_tail <= 0.5:
+        return alpha_tail
+    else:
+        alpha_mle = maximum_likelihood_estimator(data)['alpha']
+        alpha_mle = min(abs(alpha_mle), 2.0)
+        return alpha_mle
+

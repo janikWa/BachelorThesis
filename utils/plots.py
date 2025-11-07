@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 import numpy as np
 from scipy.stats import norm, kstest, levy_stable
 from scipy import stats
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+import seaborn as sns 
 
 
 def plot_weight_hist_plotly(model):
@@ -135,9 +137,9 @@ def plot_stable_fit_eval(df, beta=None, gamma=None, delta=None):
 
     Args:
         df (pd.DataFrame): DataFrame containing alpha estimates and reference values.
-        beta (float, optional): Beta parameter to filter the grid. Defaults to None. Only needed if grid DataFrame is provided. 
-        gamma (float, optional): Gamma parameter to filter the grid. Defaults to None. Only needed if grid DataFrame is provided. 
-        delta (float, optional): Delta parameter to filter the grid. Defaults to None. Only needed if grid DataFrame is provided. 
+        beta (float, optional): Beta parameter to filter the grid. Defaults to None. Only needed if grid DataFrame is provided. Must be one of this values: -1. , -0.5,  0. ,  0.5,  1.
+        gamma (float, optional): Gamma parameter to filter the grid. Defaults to None. Only needed if grid DataFrame is provided.  Must be one of this values: 0.5  , 0.875, 1.25 , 1.625, 2.
+        delta (float, optional): Delta parameter to filter the grid. Defaults to None. Only needed if grid DataFrame is provided.  Must be one of this values: -1. , -0.5,  0. ,  0.5,  1.
 
     Returns:
         None: Displays a matplotlib figure comparing true vs. estimated alpha values.
@@ -156,6 +158,7 @@ def plot_stable_fit_eval(df, beta=None, gamma=None, delta=None):
     plt.plot(df['alpha_true'], df['alpha_quantile'], label='Quantile')
     plt.plot(df['alpha_true'], df['alpha_logmom'], label='Log-Moments')
     plt.plot(df['alpha_true'], df['alpha_tail'], label='Tail-Regression')
+    plt.plot(df['alpha_true'], df['alpha_robust'], label='Robust Estimator')
 
     plt.xlabel('True alpha')
     plt.ylabel('Estimated alpha')
@@ -167,5 +170,65 @@ def plot_stable_fit_eval(df, beta=None, gamma=None, delta=None):
     plt.axis('equal')
     plt.xlim(df['alpha_true'].min(), df['alpha_true'].max())
     plt.ylim(df['alpha_true'].min(), df['alpha_true'].max())
+
+    plt.show()
+
+def plot_stable_fit_eval_zoom(df):
+    """
+    Visualize alpha estimates obtained from different estimation methods with zoom.
+    Args:
+        df (pd.DataFrame): DataFrame containing alpha estimates and reference values.
+
+    Returns:
+        None: Displays a matplotlib figure comparing true vs. estimated alpha values.
+    """
+
+    alpha_min, alpha_max = 0, 2
+    df_zoom = df[(df['alpha_true'] >= alpha_min) & (df['alpha_true'] <= alpha_max)]
+
+    fig, ax = plt.subplots(figsize=(8,8))
+
+    # Gesamtplot mit allen Werten, inkl. MLE-Ausreißer
+    sns.scatterplot(x='alpha_true', y='alpha_ml', data=df, ax=ax, color='tab:blue', legend=False)
+    sns.scatterplot(x='alpha_true', y='alpha_quantile', data=df, ax=ax, color='tab:orange', legend=False)
+    sns.scatterplot(x='alpha_true', y='alpha_logmom', data=df, ax=ax, color='tab:green', legend=False)
+    sns.scatterplot(x='alpha_true', y='alpha_tail', data=df, ax=ax, color='tab:red', legend=False)
+    sns.scatterplot(x='alpha_true', y='alpha_robust', data=df, ax=ax, color='tab:purple', legend=False)
+
+    # 45° Referenzlinie
+    ax.plot(df['alpha_true'], df['alpha_true'], 'k-')
+
+    ax.set_xlabel('True alpha')
+    ax.set_ylabel('Estimated alpha')
+    ax.set_title('Alpha Estimation: Full Range with Zoom')
+    ax.grid(True)
+
+    # Inset-Axes für Zoom
+    axins = ax.inset_axes([0.15, 0.15, 0.7, 0.7])
+
+    # Zoom-Scatterplots mit Labels für die Legende
+    sns.scatterplot(x='alpha_true', y='alpha_ml', data=df_zoom, ax=axins, label='MLE', color='tab:blue')
+    sns.scatterplot(x='alpha_true', y='alpha_quantile', data=df_zoom, ax=axins, label='Quantile', color='tab:orange')
+    sns.scatterplot(x='alpha_true', y='alpha_logmom', data=df_zoom, ax=axins, label='Log-Moments', color='tab:green')
+    sns.scatterplot(x='alpha_true', y='alpha_tail', data=df_zoom, ax=axins, label='Tail', color='tab:red')
+    sns.scatterplot(x='alpha_true', y='alpha_robust', data=df_zoom, ax=axins, label='Robust', color='tab:purple')
+
+    axins.set_xlabel(None)
+    axins.set_ylabel(None)
+    axins.tick_params(axis='both', labelsize=8)  # Tick-Label-Größe
+
+
+    # 45° Referenzlinie im Zoom
+    axins.plot(df_zoom['alpha_true'], df_zoom['alpha_true'], 'k-')
+
+    # Zoom-Limits und Grid
+    axins.set_xlim(alpha_min, alpha_max)
+    axins.set_ylim(alpha_min, alpha_max)
+    axins.grid(True)
+
+    # Legende nur im Zoom-Plot
+    axins.legend(loc='upper left', framealpha=0.8)
+
+    mark_inset(ax, axins, loc1=2, loc2=1, fc="none", ec="0.6")  
 
     plt.show()
