@@ -1,127 +1,14 @@
-import plotly.graph_objects as go
 import numpy as np
 from scipy.stats import norm, kstest, levy_stable
-import itertools
-import plotly_express as px
-import matplotlib.pyplot as plt 
-from scipy import stats
-
-def plot_weight_hist_plotly(model):
-    fig = go.Figure()
-    colors = itertools.cycle(px.colors.qualitative.Plotly)
-    
-    for name, param in model.named_parameters():
-        if 'weight' in name:
-            color = next(colors)  
-            data = param.detach().cpu().numpy().flatten()
-            
-            # hist plot
-            fig.add_trace(go.Histogram(
-                x=data,
-                nbinsx=50,
-                name=name,
-                opacity=0.6,
-                marker_color=color
-            ))
-            
-            # normal distrubution
-            mu, std = np.mean(data), np.std(data)
-            x = np.linspace(data.min(), data.max(), 200)
-            y = norm.pdf(x, mu, std)
-            y_scaled = y * len(data) * (x[1]-x[0])
-            
-            fig.add_trace(go.Scatter(
-                x=x, y=y_scaled,
-                mode='lines',
-                name=f"{name} normal distribution",
-                line=dict(color=color, width=2)
-            ))
-
-    fig.update_layout(
-        title="Distribution of weights vs normal distribution for each layer",
-        xaxis_title="values",
-        yaxis_title="count",
-        barmode='overlay'
-    )
-    fig.show()
+import optim.stable_estimators as se
+import numpy as np
+import pandas as pd
+from scipy.stats import norm, levy_stable
+import optim.stable_estimators as se
+from tqdm import tqdm
 
 
-def plot_weight_heatmap(layer: str, model=None, weights: np.ndarray = None):
-    """
-    plot heatmap of weights according to layer name or np.ndarray
-
-    Parameter:
-    ----------
-    model : torch.nn.Module, optional
-        (trained) pytorch model, only necessray if no weight array is provided
-    layer : str
-        layer name
-    weights : np.ndarray, optional
-        array storing the weiights. If provided/layer, model will be ignored
-    """
-
-    if weights is not None:
-        if not isinstance(weights, np.ndarray):
-            weights = np.array(weights)
-        fig = px.imshow(
-            weights,
-            color_continuous_scale='Viridis',
-            title= f"Heatmap of weights for {layer}",
-            labels={'x': 'Input Features', 'y': 'Output Features', 'color': 'Gewicht'}
-        )
-        fig.show()
-        return
-    
-    if model is None:
-        raise ValueError("No model or weight array provided")
-
-    found = False
-    for name, param in model.named_parameters():
-        if layer in name:
-            found = True
-            w = param.detach().cpu().numpy()
-            fig = px.imshow(
-                w,
-                color_continuous_scale='Viridis',
-                title=f"Heatmap of weights for {layer}",
-                labels={'x': 'Input Features', 'y': 'Output Features', 'color': 'Gewicht'}
-            )
-            fig.show()
-
-    if not found:
-        print(f"No layer named {layer}")
-
-
-def log_log_plot(data=None, title:str="", bins=50, x_range=(1e-3, 1e1), grid=False, opacity=1):
-    """
-    Plots a log-log histogram of the absolute values of data or a theoretical probability density function (PDF).
-
-    Parameters
-    ----------
-    data : array-like, optional
-        The empirical data to plot. If None, a theoretical distribution is plotted instead.
-    title : str
-        Title of the plot.
-    bins : int
-        Number of histogram bins.
-    x_range : tuple
-        Logarithmic range (min, max) for the x-axis.
-    """
-
-    data = np.abs(np.asarray(data))
-    plt.hist(data, bins=np.logspace(np.log10(x_range[0]), np.log10(x_range[1]), bins), 
-                density=True, alpha=opacity)
-    
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel('|Value|')
-    plt.ylabel('Density')
-    plt.title(f'Log-Log Plot: {title}')
-    plt.legend()
-    if grid: 
-        plt.grid(True, which="both", ls="--", lw=0.5)
-    plt.show()
-
+# ÜBERARBEITEN MIT EIGENER FITTING METHODE 
 def compare_stable_vs_gaussian(weights: np.ndarray):
     """
     1. fits a gaussian distribution to the input data
@@ -147,3 +34,71 @@ def compare_stable_vs_gaussian(weights: np.ndarray):
 
     return r
 
+
+def eval_fit_methods(beta: float = 0, gamma: float = 1, delta: float = 0, n_samples: int = 10000, alpha_steps: int = 100, return_data: bool = False, verbose: bool = False):
+    """
+    Evaluates different alpha estimation methods on Levy stable distributions.
+    
+    Parameters
+    ----------
+    beta : float
+        Skewness parameter.
+    gamma : float
+        Scale parameter.
+    delta : float
+        Location parameter.
+    n_samples : int
+        Number of samples to generate per alpha.
+    alpha_steps : int
+        Number of alpha values to test between 0.1 and 2.0.
+    return_data : bool
+        If True, return the last generated dataset as well.
+    verbose: bool
+        If True, shows progress while fitting 
+
+    Returns
+    -------
+    df_results : pd.DataFrame
+        DataFrame with true alpha and estimates from different methods.
+    data : np.ndarray, optional
+        The last generated dataset (if return_data=True)
+    """
+    alphas = np.linspace(0.1, 2.0, alpha_steps)
+    results = []
+
+    iterator = tqdm(alphas, desc="Estimating alpha") if verbose else alphas
+
+    for alpha_val in iterator:
+        # Generate data
+        data = levy_stable.rvs(alpha_val, beta, loc=delta, scale=gamma, size=n_samples)
+
+        # Fit using different methods, handle errors gracefully
+        try:
+            alpha_ml = se.maximum_likelihood_estimator(data)["alpha"]
+        except Exception:
+            alpha_ml = np.nan
+
+        try:
+            alpha_quantile = se.alpha_quantile_method(data)
+        except Exception:
+            alpha_quantile = np.nan
+
+        try:
+            alpha_logmom = se.alpha_log_moments(data)
+        except Exception:
+            alpha_logmom = np.nan
+
+        try:
+            alpha_tail = se.alpha_tail_regression(data)
+        except Exception:
+            alpha_tail = np.nan
+
+        results.append([alpha_val, alpha_ml, alpha_quantile, alpha_logmom, alpha_tail])
+
+    df_results = pd.DataFrame(results, columns=[
+        "alpha_true", "alpha_ml", "alpha_quantile", "alpha_logmom", "alpha_tail"
+    ])
+
+    if return_data:
+        return df_results, data
+    return df_results
