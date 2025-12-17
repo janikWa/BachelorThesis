@@ -1,11 +1,12 @@
 import numpy as np
 from scipy.stats import norm, kstest, levy_stable
-import optim.stable_estimators as se
 import numpy as np
 import pandas as pd
-from scipy.stats import norm, levy_stable
-import optim.stable_estimators as se
+import estimator.stable_estimators as se
 from tqdm import tqdm
+import os
+import torch
+
 
 
 # ÜBERARBEITEN MIT EIGENER FITTING METHODE 
@@ -97,11 +98,16 @@ def eval_fit_methods(beta: float = 0, gamma: float = 1, delta: float = 0, n_samp
             alpha_robust = se.robust_alpha_estimator(data)
         except Exception:
             alpha_robust = np.nan
+        
+        try: 
+            alpha_hill = se.alpha_hill_estimator(data)
+        except: 
+            alpha_hill = np.nan
 
-        results.append([alpha_val, alpha_ml, alpha_quantile, alpha_logmom, alpha_tail, alpha_robust])
+        results.append([alpha_val, alpha_ml, alpha_quantile, alpha_logmom, alpha_tail, alpha_robust, alpha_hill])
 
     df_results = pd.DataFrame(results, columns=[
-        "alpha_true", "alpha_ml", "alpha_quantile", "alpha_logmom", "alpha_tail", "alpha_robust"
+        "alpha_true", "alpha_ml", "alpha_quantile", "alpha_logmom", "alpha_tail", "alpha_robust", "alpha_hill"
     ])
 
     if return_data:

@@ -7,6 +7,53 @@ from scipy.stats import norm, kstest, levy_stable
 from scipy import stats
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 import seaborn as sns 
+import torch
+
+
+def layerwise_weight_dist(model, title=None, layers: list = [], bins=50, kde=False, show=True, log_log=False, log_log_grid=False):
+
+    if layers == []: 
+        layers = [i for i in range(len(model.layers))]
+
+    n_layers = len(layers)
+
+    if log_log:
+        fig, axes = plt.subplots(n_layers, 2, figsize=(12, 3*n_layers), 
+                                 gridspec_kw={'width_ratios': [2, 1]})
+        if n_layers == 1:
+            axes = np.expand_dims(axes, axis=0)
+    else:
+        fig, axes = plt.subplots(n_layers, 1, figsize=(12, 3*n_layers))
+        if n_layers == 1:
+            axes = np.expand_dims(axes, axis=0)
+    
+    for i, layer_idx in enumerate(layers):
+        try:
+            W = model.layers[layer_idx].weight.detach().cpu().numpy().flatten()
+        except AttributeError:
+            continue
+
+        #histogram
+        ax_hist = axes[i, 0] if log_log else axes[i]
+        sns.histplot(W, bins=bins, kde=kde, alpha=0.7, ax=ax_hist)
+        ax_hist.set_title(f"Layer {layer_idx+1} Histogram")
+        ax_hist.set_xlabel("Weight")
+        ax_hist.set_ylabel("Density")
+
+        # log log 
+        if log_log:
+            log_log_plot(W, ax=axes[i,1], title=f"Layer {layer_idx+1}", bins=bins, grid=log_log_grid, opacity=0.7)
+
+
+    if title is not None:
+        fig.suptitle(title, fontsize=16)
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
+
+    if show:
+        plt.show()
+    else:
+        return fig
 
 
 def plot_weight_hist_plotly(model):
@@ -94,36 +141,32 @@ def plot_weight_heatmap(layer: str, model=None, weights: np.ndarray = None):
     if not found:
         print(f"No layer named {layer}")
 
-
-def log_log_plot(data=None, title:str="", bins=50, x_range=(1e-3, 1e1), grid=False, opacity=1):
-    """
-    Plots a log-log histogram of the absolute values of data or a theoretical probability density function (PDF).
-
-    Parameters
-    ----------
-    data : array-like, optional
-        The empirical data to plot. If None, a theoretical distribution is plotted instead.
-    title : str
-        Title of the plot.
-    bins : int
-        Number of histogram bins.
-    x_range : tuple
-        Logarithmic range (min, max) for the x-axis.
-    """
-
-    data = np.abs(np.asarray(data))
-    plt.hist(data, bins=np.logspace(np.log10(x_range[0]), np.log10(x_range[1]), bins), 
-                density=True, alpha=opacity)
+def log_log_plot(data=None, ax=None, title:str="", bins=50, x_range=(1e-3, 1e1), grid=False, opacity=1): 
+    """ 
+    Plots a log-log histogram of the absolute values of data or a theoretical probability density function (PDF). 
+    Parameters ---------- 
+        data : array-like, optional The empirical data to plot. If None, a theoretical distribution is plotted instead. 
+        title : str Title of the plot. 
+        bins : int Number of histogram bins. 
+        x_range : tuple Logarithmic range (min, max) for the x-axis. """ 
     
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel('|Value|')
-    plt.ylabel('Density')
-    plt.title(f'Log-Log Plot: {title}')
-    plt.legend()
-    if grid: 
-        plt.grid(True, which="both", ls="--", lw=0.5)
-    plt.show()
+    
+    data = np.abs(np.asarray(data))
+    
+    if ax is None:
+        ax = plt.gca() 
+    ax.hist(data, bins=np.logspace(np.log10(x_range[0]), np.log10(x_range[1]), bins), density=True, alpha=opacity) 
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlabel('|Value|')
+    ax.set_ylabel('Density')
+    ax.set_title(f'Log-Log Plot: {title}')
+    
+    if grid:
+        ax.grid(True, which="both", ls="--", lw=0.5)
+
+    return ax
+
 
 
 def plot_stable_fit_eval(df, beta=None, gamma=None, delta=None):
@@ -194,6 +237,7 @@ def plot_stable_fit_eval_zoom(df):
     sns.scatterplot(x='alpha_true', y='alpha_logmom', data=df, ax=ax, color='tab:green', legend=False)
     sns.scatterplot(x='alpha_true', y='alpha_tail', data=df, ax=ax, color='tab:red', legend=False)
     sns.scatterplot(x='alpha_true', y='alpha_robust', data=df, ax=ax, color='tab:purple', legend=False)
+    sns.scatterplot(x='alpha_true', y='alpha_hill', data=df_zoom, ax=ax, color='tab:pink', legend=False)
 
     # 45° Referenzlinie
     ax.plot(df['alpha_true'], df['alpha_true'], 'k-')
@@ -212,6 +256,7 @@ def plot_stable_fit_eval_zoom(df):
     sns.scatterplot(x='alpha_true', y='alpha_logmom', data=df_zoom, ax=axins, label='Log-Moments', color='tab:green')
     sns.scatterplot(x='alpha_true', y='alpha_tail', data=df_zoom, ax=axins, label='Tail', color='tab:red')
     sns.scatterplot(x='alpha_true', y='alpha_robust', data=df_zoom, ax=axins, label='Robust', color='tab:purple')
+    sns.scatterplot(x='alpha_true', y='alpha_hill', data=df_zoom, ax=axins, label='Hill', color='tab:pink')
 
     axins.set_xlabel(None)
     axins.set_ylabel(None)
@@ -232,3 +277,39 @@ def plot_stable_fit_eval_zoom(df):
     mark_inset(ax, axins, loc1=2, loc2=1, fc="none", ec="0.6")  
 
     plt.show()
+
+
+
+def show_mnist_with_pred(model, test_loader, img_index, device): 
+    """
+    Plot an arbitrary image from the first Batch of MNIST Dataset.
+
+    Args:
+        model: trained Model
+        test_loader: test_loader 
+        img_index (int): Index of Image in Data Set. Must be in range [0,63]
+        device : device
+    """
+
+    data_iter = iter(test_loader)
+    images, labels = next(data_iter)  
+
+    model.eval() 
+    with torch.no_grad():
+
+        img = images[img_index].to(device)        
+        label_true = labels[img_index].item()
+        
+
+        output = model(img.unsqueeze(0))
+        pred = torch.argmax(output, dim=1).item()
+
+
+
+    img_2d = img.cpu().view(28,28)
+
+    plt.imshow(img_2d, cmap='gray')
+    plt.title(f"Predicted: {pred}, True: {label_true}")
+    plt.axis('off')
+    plt.show()
+

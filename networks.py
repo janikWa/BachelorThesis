@@ -79,19 +79,14 @@ class FCNet(nn.Module):
         x = self.layers[-1](x)
         return x
 
-def train(model, train_loader, optimizer, run=0, epochs=5, logging=True, model_name=None, regularizer=None, lambda_reg=0.01, architecture=None):
+def train(model, train_loader, val_loader, optimizer=None, run=0, epochs=5, logging=True, model_name=None, regularizer=None, lambda_reg=0.01, architecture=None):
 
     if logging and model_name is None: 
-        raise Exception("If 'log_weights' is True, 'weights_name' needs to be defined")
+        raise Exception("If 'logging' is True, 'model_name' must be defined.")
     
-
-    WEIGHT_PATH = "/Users/janikwahrheit/Library/CloudStorage/OneDrive-Persönlich/01_Studium/01_Bachelor/Bachelorarbeit/Code/data/weights"
-
     model.to(device)
     criterion = nn.CrossEntropyLoss()
 
-    weight_dict = {}    
-    
     for epoch in range(epochs):
         model.train()
         total_loss = 0
@@ -100,21 +95,19 @@ def train(model, train_loader, optimizer, run=0, epochs=5, logging=True, model_n
         
         for X, y in train_loader:
             X, y = X.to(device), y.to(device)
-            
+
             optimizer.zero_grad()
             outputs = model(X)
             loss = criterion(outputs, y)
-            
-            if regularizer == "remore":
-                loss += lambda_reg * optimreg.remore(model)
-            elif regularizer == "smor":
-                loss += lambda_reg * optimreg.smor(model)
-            elif regularizer == "parom":
-                loss += lambda_reg * optimreg.parom(model)
-            elif regularizer == "hill": 
+  
+            if regularizer == "hill": 
                 loss += optimreg.hill_regularizer(model, reduction="sum")
             elif regularizer == "hill_weighted": 
                 loss += optimreg.hill_regularizer_weighted(model)
+            elif regularizer == "parabolic_hill": 
+                loss += optimreg.parabolic_hill(model)
+            elif regularizer == "parabolic_mulit": 
+                loss += optimreg.parabolic_hill_multi(model)
             elif regularizer == "xiao": 
                 loss += optimreg.weighted_alpha_regularizer(model)
             elif regularizer == "decay": 
@@ -123,36 +116,138 @@ def train(model, train_loader, optimizer, run=0, epochs=5, logging=True, model_n
                 loss += optimreg.lower_threshold_weighted_alpha_regularizer(model)
             elif regularizer == "lasso": 
                 loss += optimreg.l1_regularization(model, lambda_reg)
-            
-            
+
+
             loss.backward()
+        
             optimizer.step()
             total_loss += loss.item()
             
-            # Accuracy
             _, predicted = torch.max(outputs, 1)
             correct += (predicted == y).sum().item()
             total += y.size(0)
+
         
-        epoch_loss = total_loss / len(train_loader)
-        epoch_acc = correct / total * 100
+        train_loss = total_loss / len(train_loader)
+        train_acc  = correct / total * 100
+
+        model.eval()
+        val_loss = 0
+        val_correct = 0
+        val_total = 0
+
+        with torch.no_grad():
+            for X, y in val_loader:
+                X, y = X.to(device), y.to(device)
+                outputs = model(X)
+                loss = criterion(outputs, y)
+
+                val_loss += loss.item()
+
+                _, predicted = torch.max(outputs, 1)
+                val_correct += (predicted == y).sum().item()
+                val_total += y.size(0)
         
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%")
+        val_loss /= len(val_loader)
+        val_acc = val_correct / val_total * 100
+
+        print(f"Epoch {epoch+1}/{epochs} | "
+              f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
+              f"Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.2f}%")
+
 
         if logging:
             h5pydb.log_training_data_h5(
                 model=model,
                 model_name=model_name,
-                architecture=  architecture, 
-                weight_init = model.weight_init, 
-                params = model.params, 
-                run = run, 
+                architecture=architecture,
+                weight_init=model.weight_init,
+                params=model.params,
+                run=run,
                 epoch=epoch + 1,
                 optimizer=optimizer,
-                regularizer=regularizer, 
-                loss= epoch_loss, 
-                accuracy= epoch_acc
+                regularizer=regularizer,
+                loss=train_loss,
+                accuracy=train_acc,
+                val_loss=val_loss,
+                val_accuracy=val_acc
             )
+
+
+
+# def train(model, train_loader, optimizer, run=0, epochs=5, logging=True, model_name=None, regularizer=None, lambda_reg=0.01, architecture=None):
+
+#     if logging and model_name is None: 
+#         raise Exception("If 'log_weights' is True, 'weights_name' needs to be defined")
+    
+#     model.to(device)
+#     criterion = nn.CrossEntropyLoss()
+
+#     weight_dict = {}    
+    
+#     for epoch in range(epochs):
+#         model.train()
+#         total_loss = 0
+#         correct = 0
+#         total = 0
+        
+#         for X, y in train_loader:
+#             X, y = X.to(device), y.to(device)
+            
+#             optimizer.zero_grad()
+#             outputs = model(X)
+#             loss = criterion(outputs, y)
+            
+#             if regularizer == "remore":
+#                 loss += lambda_reg * optimreg.remore(model)
+#             elif regularizer == "smor":
+#                 loss += lambda_reg * optimreg.smor(model)
+#             elif regularizer == "parom":
+#                 loss += lambda_reg * optimreg.parom(model)
+#             elif regularizer == "hill": 
+#                 loss += optimreg.hill_regularizer(model, reduction="sum")
+#             elif regularizer == "hill_weighted": 
+#                 loss += optimreg.hill_regularizer_weighted(model)
+#             elif regularizer == "xiao": 
+#                 loss += optimreg.weighted_alpha_regularizer(model)
+#             elif regularizer == "decay": 
+#                 loss += optimreg.decay_weighted_alpha_regularizer(model, epoch+1)
+#             elif regularizer == "lower": 
+#                 loss += optimreg.lower_threshold_weighted_alpha_regularizer(model)
+#             elif regularizer == "lasso": 
+#                 loss += optimreg.l1_regularization(model, lambda_reg)
+            
+            
+#             loss.backward()
+#             optimizer.step()
+#             total_loss += loss.item()
+            
+#             # Accuracy
+#             _, predicted = torch.max(outputs, 1)
+#             correct += (predicted == y).sum().item()
+#             total += y.size(0)
+        
+#         epoch_loss = total_loss / len(train_loader)
+#         epoch_acc = correct / total * 100
+        
+#         print(f"Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%")
+
+#         if logging:
+#             h5pydb.log_training_data_h5(
+#                 model=model,
+#                 model_name=model_name,
+#                 architecture=  architecture, 
+#                 weight_init = model.weight_init, 
+#                 params = model.params, 
+#                 run = run, 
+#                 epoch=epoch + 1,
+#                 optimizer=optimizer,
+#                 regularizer=regularizer, 
+#                 loss= epoch_loss, 
+#                 accuracy= epoch_acc
+#             )
+
+
 
 
 def save_weights_per_epoch(model):
