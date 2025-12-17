@@ -1,0 +1,15 @@
+depr/**/*.h5
+data/training_results/**/*.h5
+model_training/data/cifar-10-python.tar.gz
+model_training/CIFAR/data/cifar-10-python.tar.gz
+model_training/data/**/*.h5
+depr/CIFAR/**/*.h5
+.depr/**/*.h5
+*.h5
+*.tar.gz
+
+test.ipynb
+
+.DS_Store
+
+.git/lfs/
