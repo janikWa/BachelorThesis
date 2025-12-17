@@ -15,11 +15,9 @@ echo
 echo "🔍 Scanne Dateien in $REPO_PATH"
 echo "--------------------------------------------------"
 
-# Arrays initialisieren
 LFS_FILES=()
 GITHUB_BLOCKERS=()
 
-# find mit Prozesssubstitution, keine Pipe -> Arrays bleiben erhalten
 while IFS= read -r file; do
     [ "$file" = "./$SCRIPT_NAME" ] && continue
 
@@ -62,11 +60,3 @@ else
         echo "❌  $f"
     done
 
-    echo
-    echo "⚠️  Diese Dateien können NICHT zu GitHub gepusht werden,"
-    echo "    selbst mit Git LFS, wenn sie bereits normal committed sind."
-fi
-
-echo
-echo "ℹ️  Keine Dateien wurden automatisch geaddet oder committed."
-echo "    Entscheide jetzt bewusst, was in LFS oder .gitignore soll."
