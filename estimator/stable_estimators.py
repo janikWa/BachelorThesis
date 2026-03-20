@@ -172,36 +172,36 @@ def alpha_log_moments(data):
 #     alpha = min(max(alpha, 0.1), 2.0)
 #     return alpha
 
-def alpha_tail_regression(data, tail_fraction=0.2):
-    """Estimate alpha using tail regression (log-log Rank vs |X|); Nolan 
+# def alpha_tail_regression(data, tail_fraction=0.2):
+#     """Estimate alpha using tail regression (log-log Rank vs |X|); Nolan 
 
-    Parameters:
-        data (array-like): Input data.
-        tail_fraction (float): Fraction of upper tail to use.
+#     Parameters:
+#         data (array-like): Input data.
+#         tail_fraction (float): Fraction of upper tail to use.
     
-    Returns:
-        float: Alpha estimate.
-    """
-    data0 = np.asarray(data)
-    data0 = np.abs(data0 - np.median(data0)) 
-    data0 = data0[data0 > 0]
+#     Returns:
+#         float: Alpha estimate.
+#     """
+#     data0 = np.asarray(data)
+#     data0 = np.abs(data0 - np.median(data0)) 
+#     data0 = data0[data0 > 0]
     
-    n = len(data0)
-    k = max(1, int(tail_fraction * n))
+#     n = len(data0)
+#     k = max(1, int(tail_fraction * n))
     
-    # us top k values
-    tail_data = np.sort(data0)[-k:]
+#     # us top k values
+#     tail_data = np.sort(data0)[-k:]
     
-    # log-log Regression: log(Rank) ~ log(Tail Values)
-    ranks = np.arange(1, k + 1)[::-1]
-    log_ranks = np.log(ranks)
-    log_vals = np.log(tail_data)
+#     # log-log Regression: log(Rank) ~ log(Tail Values)
+#     ranks = np.arange(1, k + 1)[::-1]
+#     log_ranks = np.log(ranks)
+#     log_vals = np.log(tail_data)
     
-    A = np.vstack([log_vals, np.ones(k)]).T
-    slope, intercept = np.linalg.lstsq(A, log_ranks, rcond=None)[0]
-    alpha = -slope
-    alpha = min(max(alpha, 0.1), 2.0)
-    return alpha
+#     A = np.vstack([log_vals, np.ones(k)]).T
+#     slope, intercept = np.linalg.lstsq(A, log_ranks, rcond=None)[0]
+#     alpha = -slope
+#     alpha = min(max(alpha, 0.1), 2.0)
+#     return alpha
 
 def robust_alpha_estimator(data, tail_fraction=0.1):
     """
@@ -212,7 +212,7 @@ def robust_alpha_estimator(data, tail_fraction=0.1):
     - If MLE estimate > 2, set alpha = 2.
     """
     # Tail estimate
-    alpha_tail = alpha_tail_regression(data, tail_fraction=tail_fraction)
+    alpha_tail = alpha_hill_estimator(data, tail_fraction=tail_fraction)
     
     if alpha_tail <= 0.5:
         return alpha_tail

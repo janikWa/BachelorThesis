@@ -104,10 +104,14 @@ def train(model, train_loader, val_loader, optimizer=None, run=0, epochs=5, logg
                 loss += optimreg.hill_regularizer(model, reduction="sum")
             elif regularizer == "hill_weighted": 
                 loss += optimreg.hill_regularizer_weighted(model)
+            elif regularizer == "parabolic_hill_spec_layers0": 
+                loss += optimreg.parabolic_hill_spec_layers(model, 0)
+            elif regularizer == "parabolic_hill_spec_layers1": 
+                loss += optimreg.parabolic_hill_spec_layers(model, 1)
+            elif regularizer == "parabolic_hill_spec_layers2": 
+                loss += optimreg.parabolic_hill_spec_layers(model, 2)
             elif regularizer == "parabolic_hill": 
                 loss += optimreg.parabolic_hill(model)
-            elif regularizer == "parabolic_mulit": 
-                loss += optimreg.parabolic_hill_multi(model)
             elif regularizer == "xiao": 
                 loss += optimreg.weighted_alpha_regularizer(model)
             elif regularizer == "decay": 
@@ -116,6 +120,8 @@ def train(model, train_loader, val_loader, optimizer=None, run=0, epochs=5, logg
                 loss += optimreg.lower_threshold_weighted_alpha_regularizer(model)
             elif regularizer == "lasso": 
                 loss += optimreg.l1_regularization(model, lambda_reg)
+            elif regularizer == "ridge": 
+                loss += optimreg.l2_regularization(model, lambda_reg)
 
 
             loss.backward()
