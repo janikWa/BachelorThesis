@@ -10,6 +10,69 @@ import seaborn as sns
 import torch
 
 
+def layerwise_weight_dist_df(
+    df,
+    title=None,
+    bins=50,
+    kde=False,
+    log_log=True,
+    log_log_grid=False,
+    show=True
+):
+
+    fig, axes = plt.subplots(
+        1, 2,
+        figsize=(12, 4),
+        gridspec_kw={'width_ratios': [2, 1]}
+    )
+
+    # ---------- LEFT: Histogram ----------
+    sns.histplot(
+        data=df,
+        x="weight",
+        hue="layer",
+        bins=bins,
+        kde=kde,
+        alpha=0.6,
+        ax=axes[0]
+    )
+
+    axes[0].set_title("Weight Histogram")
+    axes[0].set_xlabel("Weight")
+    axes[0].set_ylabel("Density")
+
+    # ---------- RIGHT: Log-Log (deine Function) ----------
+    if log_log:
+
+        for layer, subdf in df.groupby("layer"):
+
+
+            # 👉 call YOUR function
+            log_log_plot(
+                data=subdf["abs_weight"].values,
+                ax=axes[1],
+                title="",          
+                bins=bins,
+                grid=log_log_grid,
+                opacity=0.6, 
+                label=layer
+            )
+
+        axes[1].set_title("Log-Log Distribution")
+        axes[1].legend(df["layer"].unique())
+
+    # ---------- Title ----------
+    if title is not None:
+        fig.suptitle(title, fontsize=16)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+    if show:
+        plt.show()
+    else:
+        return fig
+
+
 def layerwise_weight_dist(model, title=None, layers: list = [], bins=50, kde=False, show=True, log_log=False, log_log_grid=False):
 
     if layers == []: 
@@ -141,31 +204,73 @@ def plot_weight_heatmap(layer: str, model=None, weights: np.ndarray = None):
     if not found:
         print(f"No layer named {layer}")
 
-def log_log_plot(data=None, ax=None, title:str="", bins=50, x_range=(1e-3, 1e1), grid=False, opacity=1): 
-    """ 
-    Plots a log-log histogram of the absolute values of data or a theoretical probability density function (PDF). 
-    Parameters ---------- 
-        data : array-like, optional The empirical data to plot. If None, a theoretical distribution is plotted instead. 
-        title : str Title of the plot. 
-        bins : int Number of histogram bins. 
-        x_range : tuple Logarithmic range (min, max) for the x-axis. """ 
-    
-    
+
+def log_log_plot(
+    data=None,
+    ax=None,
+    title:str="",
+    bins=50,
+    x_range=(1e-3, 1e1),
+    grid=False,
+    opacity=1,
+    label=None
+):
+
     data = np.abs(np.asarray(data))
-    
+
     if ax is None:
-        ax = plt.gca() 
-    ax.hist(data, bins=np.logspace(np.log10(x_range[0]), np.log10(x_range[1]), bins), density=True, alpha=opacity) 
+        ax = plt.gca()
+
+    ax.hist(
+        data,
+        bins=np.logspace(
+            np.log10(x_range[0]),
+            np.log10(x_range[1]),
+            bins
+        ),
+        density=True,
+        alpha=opacity,
+        label=label
+    )
+
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel('|Value|')
     ax.set_ylabel('Density')
     ax.set_title(f'Log-Log Plot: {title}')
-    
+
     if grid:
         ax.grid(True, which="both", ls="--", lw=0.5)
 
     return ax
+
+
+
+# def log_log_plot(data=None, ax=None, title:str="", bins=50, x_range=(1e-3, 1e1), grid=False, opacity=1): 
+#     """ 
+#     Plots a log-log histogram of the absolute values of data or a theoretical probability density function (PDF). 
+#     Parameters ---------- 
+#         data : array-like, optional The empirical data to plot. If None, a theoretical distribution is plotted instead. 
+#         title : str Title of the plot. 
+#         bins : int Number of histogram bins. 
+#         x_range : tuple Logarithmic range (min, max) for the x-axis. """ 
+    
+    
+#     data = np.abs(np.asarray(data))
+    
+#     if ax is None:
+#         ax = plt.gca() 
+#     ax.hist(data, bins=np.logspace(np.log10(x_range[0]), np.log10(x_range[1]), bins), density=True, alpha=opacity) 
+#     ax.set_xscale('log')
+#     ax.set_yscale('log')
+#     ax.set_xlabel('|Value|')
+#     ax.set_ylabel('Density')
+#     ax.set_title(f'Log-Log Plot: {title}')
+    
+#     if grid:
+#         ax.grid(True, which="both", ls="--", lw=0.5)
+
+#     return ax
 
 
 
@@ -231,15 +336,14 @@ def plot_stable_fit_eval_zoom(df):
 
     fig, ax = plt.subplots(figsize=(8,8))
 
-    # Gesamtplot mit allen Werten, inkl. MLE-Ausreißer
     sns.scatterplot(x='alpha_true', y='alpha_ml', data=df, ax=ax, color='tab:blue', legend=False)
     sns.scatterplot(x='alpha_true', y='alpha_quantile', data=df, ax=ax, color='tab:orange', legend=False)
     sns.scatterplot(x='alpha_true', y='alpha_logmom', data=df, ax=ax, color='tab:green', legend=False)
-    sns.scatterplot(x='alpha_true', y='alpha_tail', data=df, ax=ax, color='tab:red', legend=False)
+    # sns.scatterplot(x='alpha_true', y='alpha_tail', data=df, ax=ax, color='tab:red', legend=False)
     sns.scatterplot(x='alpha_true', y='alpha_robust', data=df, ax=ax, color='tab:purple', legend=False)
-    sns.scatterplot(x='alpha_true', y='alpha_hill', data=df_zoom, ax=ax, color='tab:pink', legend=False)
+    sns.scatterplot(x='alpha_true', y='alpha_hill', data=df_zoom, ax=ax, color='tab:red', legend=False)
 
-    # 45° Referenzlinie
+
     ax.plot(df['alpha_true'], df['alpha_true'], 'k-')
 
     ax.set_xlabel('True alpha')
@@ -247,31 +351,31 @@ def plot_stable_fit_eval_zoom(df):
     ax.set_title('Alpha Estimation: Full Range with Zoom')
     ax.grid(True)
 
-    # Inset-Axes für Zoom
+  
     axins = ax.inset_axes([0.15, 0.15, 0.7, 0.7])
 
-    # Zoom-Scatterplots mit Labels für die Legende
+  
     sns.scatterplot(x='alpha_true', y='alpha_ml', data=df_zoom, ax=axins, label='MLE', color='tab:blue')
     sns.scatterplot(x='alpha_true', y='alpha_quantile', data=df_zoom, ax=axins, label='Quantile', color='tab:orange')
     sns.scatterplot(x='alpha_true', y='alpha_logmom', data=df_zoom, ax=axins, label='Log-Moments', color='tab:green')
-    sns.scatterplot(x='alpha_true', y='alpha_tail', data=df_zoom, ax=axins, label='Tail', color='tab:red')
+    # sns.scatterplot(x='alpha_true', y='alpha_tail', data=df_zoom, ax=axins, label='Tail', color='tab:red')
     sns.scatterplot(x='alpha_true', y='alpha_robust', data=df_zoom, ax=axins, label='Robust', color='tab:purple')
-    sns.scatterplot(x='alpha_true', y='alpha_hill', data=df_zoom, ax=axins, label='Hill', color='tab:pink')
+    sns.scatterplot(x='alpha_true', y='alpha_hill', data=df_zoom, ax=axins, label='Hill', color='tab:red')
 
     axins.set_xlabel(None)
     axins.set_ylabel(None)
-    axins.tick_params(axis='both', labelsize=8)  # Tick-Label-Größe
+    axins.tick_params(axis='both', labelsize=8)  
 
 
-    # 45° Referenzlinie im Zoom
+  
     axins.plot(df_zoom['alpha_true'], df_zoom['alpha_true'], 'k-')
 
-    # Zoom-Limits und Grid
+   
     axins.set_xlim(alpha_min, alpha_max)
     axins.set_ylim(alpha_min, alpha_max)
     axins.grid(True)
 
-    # Legende nur im Zoom-Plot
+
     axins.legend(loc='upper left', framealpha=0.8)
 
     mark_inset(ax, axins, loc1=2, loc2=1, fc="none", ec="0.6")  

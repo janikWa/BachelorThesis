@@ -49,6 +49,19 @@ def l1_regularization(model, lambda_l1=1e-4):
     l1_norm = sum(p.abs().sum() for p in model.parameters())
     return lambda_l1 * l1_norm
 
+def l2_regularization(model, lambda_l2=1e-4):
+    """Standard Ridge Regression (L2)
+
+    Args:
+        model (torch.model): model that should be regularized
+        lambda_l1 (float, optional): Lambda (Regularization Parameter) -> Hyperparameter Tuning. Defaults to 1e-4.
+
+    Returns:
+        float: sum of absolut weight values * lambda value 
+    """
+    l2_norm = sum(torch.sum(p ** 2) for p in model.parameters())
+    return lambda_l2 * l2_norm
+
 
 def hill_regularizer(model, k_ratio=0.1, reduction="sum", eps=1e-12):
     """First Implemetation of Hill Regularization (Hill Regularizer see Nolan - Univariate Stable Distributions)
@@ -158,28 +171,22 @@ def parabolic_hill(model, k_ratio=0.1, reduction="sum", eps=1e-12):
     else:
         return stacked.sum()
 
-def parabolic_hill_first_layers(model, n_layers=2, **kwargs):
-    losses = []
-    layer_count = 0
-
-    for name, param in model.named_parameters():
-        if "weight" not in name:
-            continue
-
-        if layer_count >= n_layers:
-            break
-
-        losses.append(parabolic_hill_single(param, **kwargs))
-        layer_count += 1
-
-    return torch.stack(losses).mean()
-
-def parabolic_hill_last_layers(model, n_layers=2, **kwargs):
+def parabolic_hill_spec_layers(model, layer=2, **kwargs):
     weights = [p for n, p in model.named_parameters() if "weight" in n]
-    selected = weights[-n_layers:]
 
-    losses = [parabolic_hill_single(p, **kwargs) for p in selected]
-    return torch.stack(losses).mean()
+    if layer >= len(weights):
+        raise ValueError(f"Layer index {layer} existiert nicht.")
+
+    return parabolic_hill_single(weights[layer], **kwargs)
+
+
+
+# def parabolic_hill_last_layers(model, n_layers=2, **kwargs):
+#     weights = [p for n, p in model.named_parameters() if "weight" in n]
+#     selected = weights[-n_layers:]
+
+#     losses = [parabolic_hill_single(p, **kwargs) for p in selected]
+#     return torch.stack(losses).mean()
 
     
 

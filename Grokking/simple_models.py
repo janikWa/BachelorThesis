@@ -1,0 +1,170 @@
+import numpy as np
+import torch as t
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+import einops
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+Simple MLP
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    
+class SimpleMLP(nn.Module):
+    """
+    Simplified version that is also grokking.
+    Consists of a learned embedding to d_model. Then the embedded vectors are concatenated to a n_ctx * d_model vector.
+    It follows an MLP layer without skip connection and a learned unembedding 
+    
+    1. Tokens: x_0 = (t_0,t_1,...) tokens are one hot encoded, e.g. t_0 = 2 = (0,0,1,0,0,0,..)
+    2. Embedding: learned embedding matrix W_E - x_1 = (W_E t_0,W_e t_1,...)
+    3. MLP: x_2 = MLP(x_1) = W_out sigma(W_in x_1 + bias)
+    4. Unembedding: learned unembedding matrix W_U: x_3 = W_U x_2
+    """
+    def __init__(self, d_model,d_vocab,n_ctx,act_type):
+        super().__init__()
+        self.embed = Embed(d_vocab=d_vocab,d_model=d_model)
+        self.mlp_without_ctx = MLP_without_ctx(d_model=d_model,d_mlp=4*d_model,n_ctx=n_ctx,act_type=act_type)
+        self.unembed = Unembed(d_vocab=d_vocab,d_model=d_model)
+
+
+    def forward(self,x):
+        x = self.embed(x)       #embed the tokens
+        x = einops.rearrange(x,"b p d -> b (p d)")       #concat the embedded vectores
+        x = self.mlp_without_ctx(x)         #MLP layer
+        return self.unembed(x)
+    
+class Embed(nn.Module):
+    """
+    Embeds the one-hot encoded input tokens with the embedding matrix W_E
+    """
+    def __init__(self, d_vocab , d_model):
+        super().__init__()
+        self.W_E = nn.Parameter(t.randn(d_model,d_vocab)/np.sqrt(d_model))
+
+    def forward(self, x):
+        return t.einsum("dbp -> bpd",self.W_E[:,x])
+
+class MLP_without_ctx(nn.Module):
+    def __init__(self, d_model,d_mlp,n_ctx,act_type):
+        super().__init__()
+        self.d_in = d_model*n_ctx
+        self.W_in = nn.Parameter(t.randn(d_mlp,self.d_in)/np.sqrt(self.d_in))
+        self.b_in = nn.Parameter(t.zeros(d_mlp))
+
+        self.W_out = nn.Parameter(t.randn(d_model,d_mlp)/np.sqrt(d_model))
+        self.b_out = nn.Parameter(t.zeros(d_model))
+
+        self.act_type = act_type
+        assert act_type in ["ReLU","GeLU"]
+
+    def forward(self,x):
+        x = t.einsum("b d, m d -> b m",x,self.W_in) + self.b_in
+        if self.act_type == "ReLU":
+            x = F.relu(x)
+
+        elif self.act_type == "GeLU":
+            x = F.gelu(x)
+
+        x = t.einsum("b m , d m -> b d",x,self.W_out)
+        return x
+    
+class Unembed(nn.Module):
+    """
+    Unembedding to the tokens
+    """
+    def __init__(self, d_vocab,d_model):
+        super().__init__()
+        self.W_U = nn.Parameter(t.randn(d_model,d_vocab)/np.sqrt(d_vocab))
+
+    def forward(self,x):
+
+        return x @ self.W_U
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+Simple Transformer
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+class Transformer(nn.Module):
+    """
+    Simple one-layer transformer with learned embedding and unembedding and fixed context length and the following architecture:
+    """
+    def __init__(self, d_model,d_mlp,d_heads,d_vocab,num_heads,n_ctx,act_type):
+        super().__init__()
+        self.embed = Embed(d_vocab=d_vocab,d_model=d_model)
+        self.pos_embed = PosEmbed(n_ctx=n_ctx,d_model=d_model)
+        self.attention = Attention(d_model=d_model,num_heads=num_heads,d_head=d_heads,n_ctx=n_ctx)
+        self.mlp = MLP(d_model=d_model,d_mlp=d_mlp,act_type=act_type)
+        self.unembed = Unembed(d_vocab=d_vocab,d_model=d_model)
+        
+    def forward(self,x):
+        x = self.embed(x)       #embed the tokens
+        
+        x = self.pos_embed(x)   #x= x + pos_embed
+        
+        x = x + self.attention(x)
+        x = x + self.mlp(x)
+        return self.unembed(x)
+
+class PosEmbed(nn.Module):
+    """
+    To each embedded token at position i, we add a vector W_pos[i,:].
+    The matrix W_pos is learned
+    """
+    def __init__(self, n_ctx,d_model):
+        super().__init__()
+        self.W_pos = nn.Parameter(t.randn(n_ctx,d_model)/np.sqrt(d_model))
+
+    def forward(self,x):
+        return x + self.W_pos
+
+class MLP(nn.Module):
+    def __init__(self, d_model,d_mlp,act_type):
+        super().__init__()
+        self.W_in = nn.Parameter(t.randn(d_mlp,d_model)/np.sqrt(d_model))
+        self.b_in = nn.Parameter(t.zeros(d_mlp))
+
+        self.W_out = nn.Parameter(t.randn(d_model,d_mlp)/np.sqrt(d_model))
+        self.b_out = nn.Parameter(t.zeros(d_model))
+
+        self.act_type = act_type
+        assert act_type in ["ReLU","GeLU"]
+
+    def forward(self,x):
+        x = t.einsum("bpd, md -> bpm",x,self.W_in) + self.b_in
+        if self.act_type == "ReLU":
+            x = F.relu(x)
+
+        elif self.act_type == "GeLU":
+            x = F.gelu(x)
+
+        x = t.einsum("bpm,dm -> bpd",x,self.W_out)
+        return x
+
+
+class Attention(nn.Module):
+    def __init__(self, d_model, num_heads, d_head, n_ctx):
+        super().__init__()
+        self.W_K = nn.Parameter(t.randn(num_heads, d_head, d_model) / np.sqrt(d_model))
+        self.W_Q = nn.Parameter(t.randn(num_heads, d_head, d_model) / np.sqrt(d_model))
+        self.W_V = nn.Parameter(t.randn(num_heads, d_head, d_model) / np.sqrt(d_model))
+        self.W_O = nn.Parameter(t.randn(d_model, d_head * num_heads) / np.sqrt(d_model))
+
+        # causal mask (1 = keep, 0 = block)
+        self.register_buffer("mask", t.tril(t.ones((n_ctx, n_ctx))))
+        self.d_head = d_head
+        self.n_ctx = n_ctx                # <-- remember it if you still need it later
+
+    def forward(self, x):
+        K = t.einsum("bpd, ihd -> biph", x, self.W_K)
+        Q = t.einsum("bpd, ihd -> biph", x, self.W_Q)
+        V = t.einsum("bpd, ihd -> biph", x, self.W_V)
+
+        scores = t.einsum("biph, biqh -> biqp", K, Q)            # [batch, head, q, k]
+        scores = scores.masked_fill(self.mask[None, None, :, :] == 0, -1e10)
+
+        attn = F.softmax(scores / np.sqrt(self.d_head), dim=-1)
+        z = t.einsum("biph, biqp -> biqh", V, attn)
+
+        z_flat = einops.rearrange(z, "b i q h -> b q (i h)")
+        out = t.einsum("bqf, df -> bqd", z_flat, self.W_O)
+        return out
