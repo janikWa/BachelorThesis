@@ -63,5 +63,5 @@ The project requires Python 3 (recommended: >= 3.8) and the following core libra
 - `matplotlib` & `seaborn` (for data visualization)
 - **R (optional)**: If the R script (`fit_stable.R`) is used for high-precision alpha estimation, an R environment including relevant packages (like `libstableR` or similar) is required.
 
-*(Tip: It is recommended to use a virtual environment (conda or virtualenv) to configure all dependencies quickly.)*
+
 
