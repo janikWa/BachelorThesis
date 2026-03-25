@@ -29,7 +29,7 @@ This repository contains the complete codebase for my Bachelor's thesis. The pro
 │   └── simple_grokking_demo.ipynb
 │
 ├── model_analytics/        # Jupyter Notebooks for post-training evaluation
-│   ├── loss_surface.ipynb  # Visualization of the loss surface
+│   ├── loss_surface.ipynb  # Test for Visualization of the loss surface (not used in final submission) 
 │   ├── MNIST/ & CIFAR/     # Specific analyses for different architectures (FC3 focused; FC10 experiments paused due to compute limitations)
 │   └── model_analytics.ipynb
 │
@@ -49,7 +49,7 @@ This repository contains the complete codebase for my Bachelor's thesis. The pro
 ├── networks.py             # Base definitions for neural network architectures (PyTorch)
 ├── stable_fitting_eval.ipynb # Evaluation of alpha estimators for different weight matrices
 ├── regularizers.ipynb      # Experiments with the Hill-regularizer vs L1/L2
-└── phase_diagram.ipynb     # Phase diagrams to illustrate network behavior
+└── phase_diagram.ipynb     # Test for phase diagrams (not used in final submission) 
 ```
 
 ---
