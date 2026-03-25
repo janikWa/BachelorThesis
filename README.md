@@ -65,15 +65,3 @@ The project requires Python 3 (recommended: >= 3.8) and the following core libra
 
 *(Tip: It is recommended to use a virtual environment (conda or virtualenv) to configure all dependencies quickly.)*
 
----
-
-## Workflow
-
-1. **Train Models:** 
-   Navigate to the `model_training/` directory and open the corresponding notebook pipeline (e.g., `training_pipeline.ipynb` or `FC4_gaussian_init.ipynb`). Here, you can specify datasets (MNIST, CIFAR) and optimizers/regularizers (SGD, Adam, Hill-Regularizer). The results are seamlessly stored in the `data/training_results/` directory via `h5pydb.py` and `sqlitedb.py`.
-2. **Training Evaluation:** 
-   The evaluation of the model behavior takes place in `model_analytics/`. Notebooks like `loss_surface.ipynb` or `model_analytics.ipynb` load the epoch history and weight matrices to visualize convergence, generalization gaps, or 3D loss surfaces.
-3. **Statistical Analysis of Weights (Estimators):**
-   Using `stable_fitting_eval.ipynb` in the root directory and the `estimator/` module, you can analyze whether and how the weights converge to a heavy-tail distribution during training and how the $\alpha$-value changes over time.
-4. **Testing Grokking Hypotheses:**
-   The `Grokking/` folder contains a small framework designed purely to explore grokking under simple architectural or algorithmic conditions.
